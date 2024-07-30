@@ -2,7 +2,10 @@ package com.example.taskreminderapp
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.Context
 import android.os.Bundle
+import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
@@ -20,6 +23,9 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import java.io.FileNotFoundException
 
 class MainActivity : AppCompatActivity() {
     private var tasksList: MutableList<Task> = mutableListOf()
@@ -56,6 +62,7 @@ class MainActivity : AppCompatActivity() {
         }
 
 //        fillDummyTasks()
+        tasksList = initTasksDataPersistent().toMutableList()
         updateSubText()
         createDeleteButtonFunction()
         buildTaskRecyclerContainer(selectionState)
@@ -70,9 +77,12 @@ class MainActivity : AppCompatActivity() {
             val bottomSheetView = layoutInflater.inflate(R.layout.add_new_task_modal, null)
 
             bottomSheetDialog.setContentView(bottomSheetView)
-            bottomSheetDialog.show()
-
             val newTaskEditText = bottomSheetView.findViewById<EditText>(R.id.editTextNewTask)
+            bottomSheetDialog.setOnShowListener {
+                newTaskEditText.requestFocus()
+                showKeyboard(newTaskEditText)
+            }
+            bottomSheetDialog.show()
 
             val cancelButton = bottomSheetView.findViewById<Button>(R.id.btnCancelTask)
             cancelButton.setOnClickListener {
@@ -126,7 +136,8 @@ class MainActivity : AppCompatActivity() {
                     return@setOnClickListener
                 }
                 if (newTaskDate != "" || newTaskTime != "") {
-                    tasksList.add(Task(tasksList.size, newTaskContent, newTaskDate, newTaskTime, currentDateTime))
+                    tasksList.add(Task(tasksList.size + 1, newTaskContent, newTaskDate, newTaskTime, currentDateTime))
+                    saveTasksDataPersistent()
                     refreshTaskRecyclerContainer()
                     bottomSheetDialog.dismiss()
                     resetNewTaskInputs()
@@ -151,9 +162,13 @@ class MainActivity : AppCompatActivity() {
         val bottomSheetView = layoutInflater.inflate(R.layout.edit_existing_task_modal, null)
 
         bottomSheetDialog.setContentView(bottomSheetView)
+        val editingTaskEditText = bottomSheetView.findViewById<EditText>(R.id.editTextExistingTask)
+        bottomSheetDialog.setOnShowListener {
+            editingTaskEditText.requestFocus()
+            showKeyboard(editingTaskEditText)
+        }
         bottomSheetDialog.show()
 
-        val editingTaskEditText = bottomSheetView.findViewById<EditText>(R.id.editTextExistingTask)
         editingTaskEditText.setText(currentEditingTask.content)
 
         // Convert date string
@@ -188,7 +203,7 @@ class MainActivity : AppCompatActivity() {
                     editTaskDate = "$selectedDay/${selectedMonth + 1}/$selectedYear"
                     updateDateText(setDateButton, editTaskDate)
                 },
-                year, month, day
+                year, month - 1, day
             )
             datePickerView.show()
         }
@@ -233,6 +248,7 @@ class MainActivity : AppCompatActivity() {
                         task.time = editTaskTime
                     }
                 }
+                saveTasksDataPersistent()
                 refreshTaskRecyclerContainer()
                 bottomSheetDialog.dismiss()
                 resetEditTaskInputs()
@@ -280,12 +296,6 @@ class MainActivity : AppCompatActivity() {
         button.setText(time)
     }
 
-    private fun refreshTaskRecyclerContainer() {
-        if (tasksRecyclerAdapter != null) {
-            tasksRecyclerAdapter.updateAllItems(tasksList, selectionState)
-        }
-    }
-
     private fun buildTaskRecyclerContainer(localSelectionState: Boolean) {
         val tasksRecyclerContainer = findViewById<RecyclerView>(R.id.RecyclerTasksContainer)
         this.tasksRecyclerAdapter = TaskRecyclerAdapter(tasksList, localSelectionState,
@@ -314,6 +324,12 @@ class MainActivity : AppCompatActivity() {
         tasksRecyclerContainer.layoutManager = LinearLayoutManager(this)
     }
 
+    private fun refreshTaskRecyclerContainer() {
+        if (tasksRecyclerAdapter != null) {
+            tasksRecyclerAdapter.updateAllItems(tasksList, selectionState)
+        }
+    }
+
     private fun createDeleteButtonFunction() {
         val deleteButton = findViewById<ImageButton>(R.id.btnDeleteTasks)
         deleteButton.setOnClickListener {
@@ -321,11 +337,12 @@ class MainActivity : AppCompatActivity() {
                 tasksList = tasksList.filter { task: Task ->
                     !task.selected
                 }.toMutableList()
+                saveTasksDataPersistent()
                 refreshTaskRecyclerContainer()
                 if (tasksList.size == 0) {
                     selectionState = false
-                    updateSubText()
                 }
+                updateSubText()
             }
         }
     }
@@ -349,9 +366,32 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshSelectionTasksList() {
-        tasksList.forEach() {
+        tasksList.forEach {
             task: Task ->
             task.selected = false
+        }
+    }
+
+    private fun showKeyboard(view: View) {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    private fun saveTasksDataPersistent() {
+        val json = Gson().toJson(TasksListStructure(tasksList))
+        openFileOutput("tasks.json", Context.MODE_PRIVATE).use {
+            outputStream ->
+            outputStream.write(json.toByteArray())
+        }
+    }
+
+    private fun initTasksDataPersistent(): List<Task> {
+        return try {
+            val fileContents = openFileInput("tasks.json").bufferedReader().use { it.readText() }
+            val taskListType = object : TypeToken<TasksListStructure>() {}.type
+            Gson().fromJson<TasksListStructure>(fileContents, taskListType).tasks
+        } catch (e: FileNotFoundException) {
+            emptyList()
         }
     }
 
