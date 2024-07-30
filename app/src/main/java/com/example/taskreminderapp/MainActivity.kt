@@ -1,6 +1,7 @@
 package com.example.taskreminderapp
 
 import android.os.Bundle
+import android.widget.ImageButton
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -12,8 +13,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 
 class MainActivity : AppCompatActivity() {
-    var tasksList: MutableList<Task> = mutableListOf()
-    val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+    private var tasksList: MutableList<Task> = mutableListOf()
+    private var selectionState = false
+    private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+    private lateinit var tasksRecyclerAdapter: TaskRecyclerAdapter
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -25,11 +29,81 @@ class MainActivity : AppCompatActivity() {
         }
 
         fillDummyTasks()
-        findViewById<TextView>(R.id.textViewTaskAmount).setText("Showing ${tasksList.size} Tasks")
+        updateSubText()
+        createDeleteButtonFunction()
+        buildTaskRecyclerContainer(selectionState)
+    }
+
+    private fun refreshTaskRecyclerContainer() {
+        if (tasksRecyclerAdapter != null) {
+            tasksRecyclerAdapter.updateAllItems(tasksList, selectionState)
+        }
+    }
+
+    private fun buildTaskRecyclerContainer(localSelectionState: Boolean) {
         val tasksRecyclerContainer = findViewById<RecyclerView>(R.id.RecyclerTasksContainer)
-        val tasksRecyclerAdapter = TaskRecyclerAdapter(tasksList)
+        this.tasksRecyclerAdapter = TaskRecyclerAdapter(tasksList, localSelectionState,
+            onItemLongClick = {
+            task: Task ->
+            selectionState = !selectionState
+            if (selectionState) {
+                task.selected = true
+            } else {
+                refreshSelectionTasksList()
+            }
+            updateSubText()
+            refreshTaskRecyclerContainer()
+        }, onItemClick = {
+            task: Task ->
+            if (selectionState) {
+                task.selected = !task.selected
+                refreshTaskRecyclerContainer()
+                updateSubText()
+            }
+        })
         tasksRecyclerContainer.adapter = tasksRecyclerAdapter
         tasksRecyclerContainer.layoutManager = LinearLayoutManager(this)
+    }
+
+    private fun createDeleteButtonFunction() {
+        val deleteButton = findViewById<ImageButton>(R.id.btnDeleteTasks)
+        deleteButton.setOnClickListener {
+            if (selectionState) {
+                tasksList = tasksList.filter { task: Task ->
+                    !task.selected
+                }.toMutableList()
+                refreshTaskRecyclerContainer()
+                if (tasksList.size == 0) {
+                    selectionState = false
+                    updateSubText()
+                }
+            }
+        }
+    }
+
+    private fun updateSubText() {
+        val subText = findViewById<TextView>(R.id.textViewTaskAmount)
+        val deleteButton = findViewById<ImageButton>(R.id.btnDeleteTasks)
+        if (!selectionState)  {
+            deleteButton.setImageResource(R.drawable.delete_icon)
+            subText.setTextColor(getColor(R.color.foreground))
+            subText.setText("Showing ${tasksList.size} Tasks")
+        } else {
+            val currentlySelectedTasks = tasksList.filter {
+                task ->
+                task.selected
+            }
+            deleteButton.setImageResource(R.drawable.delete_icon_active)
+            subText.setTextColor(getColor(R.color.accent_red))
+            subText.setText("Currently Selecting ${currentlySelectedTasks.size} Tasks")
+        }
+    }
+
+    private fun refreshSelectionTasksList() {
+        tasksList.forEach() {
+            task: Task ->
+            task.selected = false
+        }
     }
 
     private fun fillDummyTasks() {
