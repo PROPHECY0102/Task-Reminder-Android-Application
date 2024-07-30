@@ -1,6 +1,9 @@
 package com.example.taskreminderapp
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.os.Bundle
+import android.widget.Button
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
@@ -9,7 +12,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 
 class MainActivity : AppCompatActivity() {
@@ -17,6 +23,16 @@ class MainActivity : AppCompatActivity() {
     private var selectionState = false
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
     private lateinit var tasksRecyclerAdapter: TaskRecyclerAdapter
+
+    private var calendar = Calendar.getInstance()
+    private var currentYear = calendar.get(Calendar.YEAR)
+    private var currentMonth = calendar.get(Calendar.MONTH)
+    private var currentDay = calendar.get(Calendar.DAY_OF_MONTH)
+    private var currentHour = calendar.get(Calendar.HOUR_OF_DAY)
+    private var currentMinute = calendar.get(Calendar.MINUTE)
+
+    private var newTaskDate = ""
+    private var newTaskTime = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,10 +44,75 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        fillDummyTasks()
+//        fillDummyTasks()
         updateSubText()
         createDeleteButtonFunction()
         buildTaskRecyclerContainer(selectionState)
+        createAddTaskFunctionality()
+    }
+
+    private fun createAddTaskFunctionality() {
+        val addTaskButton = findViewById<FloatingActionButton>(R.id.btnAddTask)
+        addTaskButton.setOnClickListener {
+            val bottomSheetDialog = BottomSheetDialog(this)
+            val bottomSheetView = layoutInflater.inflate(R.layout.add_new_task_modal, null)
+
+            bottomSheetDialog.setContentView(bottomSheetView)
+            bottomSheetDialog.show()
+
+            val cancelButton = bottomSheetView.findViewById<Button>(R.id.btnCancelTask)
+            cancelButton.setOnClickListener {
+                bottomSheetDialog.dismiss()
+            }
+
+            val setDateButton = bottomSheetView.findViewById<Button>(R.id.btnSetDate)
+            setDateButton.setOnClickListener {
+                val datePickerView = DatePickerDialog(
+                    this,
+                    { _, selectedYear, selectedMonth, selectedDay ->
+                        updateCurrentTime()
+                        newTaskDate = "$selectedDay/${selectedMonth + 1}/$selectedYear"
+                        updateDateText(setDateButton)
+                    },
+                    currentYear, currentMonth, currentDay
+                )
+                datePickerView.show()
+            }
+
+            val setTimeButton = bottomSheetView.findViewById<Button>(R.id.btnSetTime)
+            setTimeButton.setOnClickListener {
+                val timePickerView = TimePickerDialog(
+                    this,
+                    {
+                        _, selectedHour, selectedMinute ->
+                        updateCurrentTime()
+                        val amPm = if (selectedHour < 12) "A.M" else "P.M"
+                        val hour = if (selectedHour > 12) selectedHour - 12 else if (selectedHour == 0) 12 else selectedHour
+                        newTaskTime = "${hour}:${selectedMinute} $amPm"
+                        updateTimeText(setTimeButton)
+                    },
+                    currentHour, currentMinute, false
+                )
+                timePickerView.show()
+            }
+        }
+    }
+
+    private fun updateCurrentTime() {
+        calendar = Calendar.getInstance()
+        currentYear = calendar.get(Calendar.YEAR)
+        currentMonth = calendar.get(Calendar.MONTH)
+        currentDay = calendar.get(Calendar.DAY_OF_MONTH)
+        currentHour = calendar.get(Calendar.HOUR_OF_DAY)
+        currentMinute = calendar.get(Calendar.MINUTE)
+    }
+
+    private fun updateDateText(button: Button) {
+        button.setText(newTaskDate)
+    }
+
+    private fun updateTimeText(button: Button) {
+        button.setText(newTaskTime)
     }
 
     private fun refreshTaskRecyclerContainer() {
