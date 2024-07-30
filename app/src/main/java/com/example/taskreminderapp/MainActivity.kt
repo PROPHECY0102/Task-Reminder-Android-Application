@@ -4,9 +4,12 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.os.Bundle
 import android.widget.Button
+import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -30,9 +33,17 @@ class MainActivity : AppCompatActivity() {
     private var currentDay = calendar.get(Calendar.DAY_OF_MONTH)
     private var currentHour = calendar.get(Calendar.HOUR_OF_DAY)
     private var currentMinute = calendar.get(Calendar.MINUTE)
+    private var currentDateTime = "$currentYear/$currentMonth/$currentDay $currentHour:$currentMinute"
 
+    private var newTaskContent = ""
     private var newTaskDate = ""
     private var newTaskTime = ""
+
+    private lateinit var currentEditingTask: Task
+
+    private var editTaskContent = ""
+    private var editTaskDate = ""
+    private var editTaskTime = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,11 +65,14 @@ class MainActivity : AppCompatActivity() {
     private fun createAddTaskFunctionality() {
         val addTaskButton = findViewById<FloatingActionButton>(R.id.btnAddTask)
         addTaskButton.setOnClickListener {
+            resetNewTaskInputs()
             val bottomSheetDialog = BottomSheetDialog(this)
             val bottomSheetView = layoutInflater.inflate(R.layout.add_new_task_modal, null)
 
             bottomSheetDialog.setContentView(bottomSheetView)
             bottomSheetDialog.show()
+
+            val newTaskEditText = bottomSheetView.findViewById<EditText>(R.id.editTextNewTask)
 
             val cancelButton = bottomSheetView.findViewById<Button>(R.id.btnCancelTask)
             cancelButton.setOnClickListener {
@@ -72,7 +86,7 @@ class MainActivity : AppCompatActivity() {
                     { _, selectedYear, selectedMonth, selectedDay ->
                         updateCurrentTime()
                         newTaskDate = "$selectedDay/${selectedMonth + 1}/$selectedYear"
-                        updateDateText(setDateButton)
+                        updateDateText(setDateButton, newTaskDate)
                     },
                     currentYear, currentMonth, currentDay
                 )
@@ -88,14 +102,164 @@ class MainActivity : AppCompatActivity() {
                         updateCurrentTime()
                         val amPm = if (selectedHour < 12) "A.M" else "P.M"
                         val hour = if (selectedHour > 12) selectedHour - 12 else if (selectedHour == 0) 12 else selectedHour
-                        newTaskTime = "${hour}:${selectedMinute} $amPm"
-                        updateTimeText(setTimeButton)
+                        newTaskTime = "${hour}:${selectedMinute.toString().padStart(2, '0')} $amPm"
+                        updateTimeText(setTimeButton, newTaskTime)
                     },
                     currentHour, currentMinute, false
                 )
                 timePickerView.show()
             }
+
+            val saveButton = bottomSheetView.findViewById<Button>(R.id.btnCreateSave)
+            saveButton.setOnClickListener {
+                newTaskContent = newTaskEditText.text.toString()
+                updateCurrentTime()
+                if (newTaskContent == "") {
+                    val alertView = AlertDialog.Builder(this)
+                    alertView.setTitle("Task Content cannot be Empty!")
+                    alertView.setMessage("Please fill in the task content input for this reminder before saving it.")
+                    alertView.setPositiveButton(android.R.string.ok) { dialog, which ->
+                        Toast.makeText(applicationContext,
+                            android.R.string.ok, Toast.LENGTH_SHORT).show()
+                    }
+                    alertView.show()
+                    return@setOnClickListener
+                }
+                if (newTaskDate != "" || newTaskTime != "") {
+                    tasksList.add(Task(tasksList.size, newTaskContent, newTaskDate, newTaskTime, currentDateTime))
+                    refreshTaskRecyclerContainer()
+                    bottomSheetDialog.dismiss()
+                    resetNewTaskInputs()
+                } else {
+                    val alertView = AlertDialog.Builder(this)
+                    alertView.setTitle("No Date or Time has been set!")
+                    alertView.setMessage("Please set a date and time for this reminder before saving it.")
+                    alertView.setPositiveButton(android.R.string.ok) { dialog, which ->
+                        Toast.makeText(applicationContext,
+                            android.R.string.ok, Toast.LENGTH_SHORT).show()
+                    }
+                    alertView.show()
+                }
+            }
         }
+    }
+
+    private fun editCurrentTaskFunctionality() {
+        if (currentEditingTask == null) return
+        resetEditTaskInputs()
+        val bottomSheetDialog = BottomSheetDialog(this)
+        val bottomSheetView = layoutInflater.inflate(R.layout.edit_existing_task_modal, null)
+
+        bottomSheetDialog.setContentView(bottomSheetView)
+        bottomSheetDialog.show()
+
+        val editingTaskEditText = bottomSheetView.findViewById<EditText>(R.id.editTextExistingTask)
+        editingTaskEditText.setText(currentEditingTask.content)
+
+        // Convert date string
+        val dateString = currentEditingTask.date
+        val (day, month, year) = dateString.split("/").map { it.toInt() }
+
+        // Convert time string
+        val timeString = currentEditingTask.time
+        val timeParts = timeString.replace(".", "").split(":")
+        val hourMinute = timeParts[0].toInt()
+        val minute = timeParts[1].substring(0, 2).toInt()
+        val period = timeParts[1].substring(3)
+
+        val hour = when {
+            period.uppercase() == "PM" && hourMinute != 12 -> hourMinute + 12
+            period.uppercase() == "AM" && hourMinute == 12 -> 0
+            else -> hourMinute
+        }
+
+        val cancelButton = bottomSheetView.findViewById<Button>(R.id.btnCancelEditTask)
+        cancelButton.setOnClickListener {
+            bottomSheetDialog.dismiss()
+        }
+
+        val setDateButton = bottomSheetView.findViewById<Button>(R.id.btnSetEditDate)
+        editTaskDate = currentEditingTask.date
+        setDateButton.setText(currentEditingTask.date)
+        setDateButton.setOnClickListener {
+            val datePickerView = DatePickerDialog(
+                this,
+                { _, selectedYear, selectedMonth, selectedDay ->
+                    editTaskDate = "$selectedDay/${selectedMonth + 1}/$selectedYear"
+                    updateDateText(setDateButton, editTaskDate)
+                },
+                year, month, day
+            )
+            datePickerView.show()
+        }
+
+        val setTimeButton = bottomSheetView.findViewById<Button>(R.id.btnSetEditTime)
+        editTaskTime = currentEditingTask.time
+        setTimeButton.setText(currentEditingTask.time)
+        setTimeButton.setOnClickListener {
+            val timePickerView = TimePickerDialog(
+                this,
+                {
+                        _, selectedHour, selectedMinute ->
+                    val amPm = if (selectedHour < 12) "A.M" else "P.M"
+                    val hour = if (selectedHour > 12) selectedHour - 12 else if (selectedHour == 0) 12 else selectedHour
+                    editTaskTime = "${hour}:${selectedMinute.toString().padStart(2, '0')} $amPm"
+                    updateTimeText(setTimeButton, editTaskTime)
+                },
+                hour, minute, false
+            )
+            timePickerView.show()
+        }
+
+        val saveButton = bottomSheetView.findViewById<Button>(R.id.btnCreateEdit)
+        saveButton.setOnClickListener {
+            editTaskContent = editingTaskEditText.text.toString()
+            if (editTaskContent == "") {
+                val alertView = AlertDialog.Builder(this)
+                alertView.setTitle("Task Content cannot be Empty!")
+                alertView.setMessage("Please fill in the task content input for this reminder before editing it.")
+                alertView.setPositiveButton(android.R.string.ok) { dialog, which ->
+                    Toast.makeText(applicationContext,
+                        android.R.string.ok, Toast.LENGTH_SHORT).show()
+                }
+                alertView.show()
+                return@setOnClickListener
+            }
+            if (editTaskDate != "" || editTaskTime != "") {
+                for (task in tasksList) {
+                    if (task.id == currentEditingTask.id) {
+                        task.content = editTaskContent
+                        task.date = editTaskDate
+                        task.time = editTaskTime
+                    }
+                }
+                refreshTaskRecyclerContainer()
+                bottomSheetDialog.dismiss()
+                resetEditTaskInputs()
+            } else {
+                val alertView = AlertDialog.Builder(this)
+                alertView.setTitle("No Date or Time has been set!")
+                alertView.setMessage("Please set a date and time for this reminder before editing it.")
+                alertView.setPositiveButton(android.R.string.ok) { dialog, which ->
+                    Toast.makeText(applicationContext,
+                        android.R.string.ok, Toast.LENGTH_SHORT).show()
+                }
+                alertView.show()
+            }
+        }
+
+    }
+
+    private fun resetNewTaskInputs() {
+        newTaskContent = ""
+        newTaskTime = ""
+        newTaskDate = ""
+    }
+
+    private fun resetEditTaskInputs() {
+        editTaskContent = ""
+        editTaskDate = ""
+        editTaskTime = ""
     }
 
     private fun updateCurrentTime() {
@@ -105,14 +269,15 @@ class MainActivity : AppCompatActivity() {
         currentDay = calendar.get(Calendar.DAY_OF_MONTH)
         currentHour = calendar.get(Calendar.HOUR_OF_DAY)
         currentMinute = calendar.get(Calendar.MINUTE)
+        currentDateTime = "$currentYear/$currentMonth/$currentDay $currentHour:$currentMinute"
     }
 
-    private fun updateDateText(button: Button) {
-        button.setText(newTaskDate)
+    private fun updateDateText(button: Button, date: String) {
+        button.setText(date)
     }
 
-    private fun updateTimeText(button: Button) {
-        button.setText(newTaskTime)
+    private fun updateTimeText(button: Button, time: String) {
+        button.setText(time)
     }
 
     private fun refreshTaskRecyclerContainer() {
@@ -140,6 +305,9 @@ class MainActivity : AppCompatActivity() {
                 task.selected = !task.selected
                 refreshTaskRecyclerContainer()
                 updateSubText()
+            } else {
+                currentEditingTask = task
+                editCurrentTaskFunctionality()
             }
         })
         tasksRecyclerContainer.adapter = tasksRecyclerAdapter

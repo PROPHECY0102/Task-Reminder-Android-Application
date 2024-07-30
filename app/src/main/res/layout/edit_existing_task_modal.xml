@@ -14,7 +14,7 @@
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/btnCancelTask"
+            android:id="@+id/btnCancelEditTask"
             android:minHeight="0dp"
             android:minWidth="0dp"
             android:layout_width="wrap_content"
@@ -31,7 +31,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Create New Task"
+            android:text="Edit This Task"
             android:fontFamily="@font/custom_bold"
             android:textColor="@color/foreground"
             android:textSize="22dp"
@@ -39,12 +39,12 @@
             android:textAlignment="center"></TextView>
 
         <Button
-            android:id="@+id/btnCreateSave"
+            android:id="@+id/btnCreateEdit"
             android:minHeight="0dp"
             android:minWidth="0dp"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:text="Save"
+            android:text="Edit"
             android:background="@android:color/transparent"
             android:fontFamily="@font/custom_regular"
             android:textSize="18dp"
@@ -55,7 +55,7 @@
     </LinearLayout>
 
     <EditText
-        android:id="@+id/editTextNewTask"
+        android:id="@+id/editTextExistingTask"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="Type New Task"
@@ -74,7 +74,7 @@
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/btnSetDate"
+            android:id="@+id/btnSetEditDate"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:backgroundTint="@color/accent_green"
@@ -85,7 +85,7 @@
             android:layout_marginRight="8dp"></Button>
 
         <Button
-            android:id="@+id/btnSetTime"
+            android:id="@+id/btnSetEditTime"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:backgroundTint="@color/accent_green"
