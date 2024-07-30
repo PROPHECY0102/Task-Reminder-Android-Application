@@ -5,7 +5,8 @@ class Task(
     var content: String,
     var date: String,
     var time: String,
-    var createdAt: String
+    var createdAt: String,
+    var selected: Boolean = false
 ) {
     fun shortenContentText(n: Int): String {
         if (content.length > n) {

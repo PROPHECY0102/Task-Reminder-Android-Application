@@ -8,6 +8,7 @@
 
 
     <androidx.cardview.widget.CardView
+        android:id="@+id/cardTaskBackground"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -16,20 +17,22 @@
         app:layout_constraintTop_toTopOf="parent"
         android:elevation="8dp"
         app:cardCornerRadius="20dp"
+        app:cardBackgroundColor="@color/primary"
         android:layout_marginBottom="20dp">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingVertical="16dp"
-            android:background="@color/primary"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            >
 
             <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/btnTaskRadio"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:src="@drawable/radio_unchecked_icon"
+                android:src="@drawable/double_arrow_icon"
                 android:background="@null"
-                android:padding="8dp"
+                android:padding="6dp"
                 android:scaleType="fitCenter"
                 android:adjustViewBounds="true"
                 android:layout_marginLeft="16dp"/>
