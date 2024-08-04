@@ -16,3 +16,5 @@ class Task(
         }
     }
 }
+
+data class TasksListStructure(val tasks: List<Task>)

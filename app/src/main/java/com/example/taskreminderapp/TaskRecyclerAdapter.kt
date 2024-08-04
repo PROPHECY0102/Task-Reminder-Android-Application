@@ -35,7 +35,7 @@ class TaskRecyclerAdapter(
 
             if (!selectionState) {
                 cardTaskBackground.setCardBackgroundColor(Color.parseColor("#FF334155"))
-                radioButton.setImageResource(R.drawable.double_arrow_icon)
+                radioButton.setImageResource(R.drawable.notification_active_icon)
             } else {
                 if (task.selected == true) {
                     cardTaskBackground.setCardBackgroundColor(Color.parseColor("#FFF43F5E"))
