@@ -30,7 +30,7 @@
                 android:id="@+id/btnTaskRadio"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:src="@drawable/double_arrow_icon"
+                android:src="@drawable/notification_active_icon"
                 android:background="@null"
                 android:padding="6dp"
                 android:scaleType="fitCenter"
