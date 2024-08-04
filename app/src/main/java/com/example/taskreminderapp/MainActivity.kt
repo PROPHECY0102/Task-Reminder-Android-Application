@@ -21,7 +21,6 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -39,9 +38,6 @@ import java.util.Date
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.io.FileNotFoundException
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.util.Locale
 import java.util.TimeZone
 
 class MainActivity : AppCompatActivity() {
@@ -137,7 +133,7 @@ class MainActivity : AppCompatActivity() {
                         val hour = if (selectedHour > 12) selectedHour - 12 else if (selectedHour == 0) 12 else selectedHour
                         val paddedHour = hour.toString().padStart(2, '0')
                         val paddedMinute = selectedMinute.toString().padStart(2, '0')
-                        newTaskTimeNotForDisplay = "$paddedHour:$paddedMinute:01"
+                        newTaskTimeNotForDisplay = "$paddedHour:$paddedMinute:00"
                         newTaskTime = "${paddedHour}:${paddedMinute} $amPm"
                         updateTimeText(setTimeButton, newTaskTime)
                     },
@@ -247,7 +243,7 @@ class MainActivity : AppCompatActivity() {
 
         val setTimeButton = bottomSheetView.findViewById<Button>(R.id.btnSetEditTime)
         editTaskTime = currentEditingTask.time
-        editTaskTimeNotForDisplay = "${currentEditingTask.time.substring(0, 2)}:${currentEditingTask.time.substring(3, 5)}:01"
+        editTaskTimeNotForDisplay = "${currentEditingTask.time.substring(0, 2)}:${currentEditingTask.time.substring(3, 5)}:00"
         setTimeButton.setText(currentEditingTask.time)
         setTimeButton.setOnClickListener {
             val timePickerView = TimePickerDialog(
@@ -475,7 +471,7 @@ class MainActivity : AppCompatActivity() {
             set(Calendar.MILLISECOND, localCalendar.get(Calendar.MILLISECOND))
         }
 
-        return utcCalendar.timeInMillis
+        return utcCalendar.timeInMillis + 14400000
     }
 
     @RequiresApi(Build.VERSION_CODES.S)
