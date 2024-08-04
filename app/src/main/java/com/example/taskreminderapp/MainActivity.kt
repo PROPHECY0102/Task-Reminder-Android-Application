@@ -13,11 +13,13 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
+import android.view.MenuItem
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -43,6 +45,7 @@ import java.util.TimeZone
 class MainActivity : AppCompatActivity() {
     private var tasksList: MutableList<Task> = mutableListOf()
     private var selectionState = false
+    private var sortMode = "descending"
     private lateinit var tasksRecyclerAdapter: TaskRecyclerAdapter
 
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
@@ -77,13 +80,18 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-//        fillDummyTasks()
+//        fillDummyTasks() only used for testing/debugging RecyclerView
+        onLaunchInitialise()
+    }
+
+    private fun onLaunchInitialise() {
         checkNotificationPermission()
         tasksList = initTasksDataPersistent().toMutableList()
         updateSubText()
-        createDeleteButtonFunction()
+        createDeleteButtonFunctionality()
         buildTaskRecyclerContainer(selectionState)
         createAddTaskFunctionality()
+        createDropdownMenuFunctionality()
     }
 
     private fun createAddTaskFunctionality() {
@@ -342,8 +350,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildTaskRecyclerContainer(localSelectionState: Boolean) {
+        val sortedList = sortList()
         val tasksRecyclerContainer = findViewById<RecyclerView>(R.id.RecyclerTasksContainer)
-        this.tasksRecyclerAdapter = TaskRecyclerAdapter(tasksList, localSelectionState,
+        this.tasksRecyclerAdapter = TaskRecyclerAdapter(sortedList, localSelectionState,
             onItemLongClick = {
             task: Task ->
             selectionState = !selectionState
@@ -370,12 +379,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshTaskRecyclerContainer() {
+        val sortedList = sortList()
         if (tasksRecyclerAdapter != null) {
-            tasksRecyclerAdapter.updateAllItems(tasksList, selectionState)
+            tasksRecyclerAdapter.updateAllItems(sortedList, selectionState)
         }
     }
 
-    private fun createDeleteButtonFunction() {
+    private fun createDeleteButtonFunctionality() {
         val deleteButton = findViewById<ImageButton>(R.id.btnDeleteTasks)
         deleteButton.setOnClickListener {
             if (selectionState) {
@@ -453,7 +463,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun convertToUtcMillis(localTimeInMillis: Long): Long {
+    private fun convertToUtcMillis(localTimeInMillis: Long): Long {
         val localDate = Date(localTimeInMillis)
         val localCalendar = Calendar.getInstance().apply {
             time = localDate
@@ -608,6 +618,39 @@ class MainActivity : AppCompatActivity() {
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
         intent.data = Uri.fromParts("package", packageName, null)
         startActivity(intent)
+    }
+
+    private fun createDropdownMenuFunctionality() {
+        val dropdownButton = findViewById<ImageButton>(R.id.btnMenuDropdown)
+        dropdownButton.setOnClickListener {
+            view: View ->
+            val popupMenu = PopupMenu(this, view)
+            popupMenu.menuInflater.inflate(R.menu.dropdown_menu, popupMenu.menu)
+
+            popupMenu.setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    R.id.btnSortDescending -> {
+                        sortMode = "descending"
+                        refreshTaskRecyclerContainer()
+                        true
+                    }
+                    R.id.btnSortAscending -> {
+                        sortMode = "ascending"
+                        refreshTaskRecyclerContainer()
+                        true
+                    }
+                    else -> false
+                }
+            }
+            popupMenu.show()
+        }
+    }
+
+    private fun sortList(): MutableList<Task> {
+        if (sortMode == "descending") {
+            return tasksList.sortedByDescending { it.id }.toMutableList()
+        }
+        return tasksList.sortedBy { it.id }.toMutableList()
     }
 
     // Unused method
