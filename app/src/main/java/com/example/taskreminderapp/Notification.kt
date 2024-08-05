@@ -2,6 +2,7 @@ package com.example.taskreminderapp
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -31,10 +32,23 @@ class Notification: BroadcastReceiver() {
             .setContentTitle(title)
             .setContentText(message)
             .setSmallIcon(R.drawable.notification_active_icon)
-            .setAutoCancel(true)
+            .setContentIntent(createPendingIntent(context))
             .build()
 
         notificationManager.notify(notificationId, notification)
+    }
+
+    private fun createPendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+
+        return PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
 }

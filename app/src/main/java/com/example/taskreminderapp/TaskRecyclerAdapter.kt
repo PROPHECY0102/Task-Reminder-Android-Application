@@ -35,7 +35,11 @@ class TaskRecyclerAdapter(
 
             if (!selectionState) {
                 cardTaskBackground.setCardBackgroundColor(Color.parseColor("#FF334155"))
-                radioButton.setImageResource(R.drawable.notification_active_icon)
+                if (task.due > System.currentTimeMillis()) {
+                    radioButton.setImageResource(R.drawable.notification_active_icon)
+                } else {
+                    radioButton.setImageResource(R.drawable.baseline_check_circle_24)
+                }
             } else {
                 if (task.selected == true) {
                     cardTaskBackground.setCardBackgroundColor(Color.parseColor("#FFF43F5E"))

@@ -13,7 +13,6 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
-import android.view.MenuItem
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
@@ -43,7 +42,70 @@ import java.io.FileNotFoundException
 import java.util.TimeZone
 
 class MainActivity : AppCompatActivity() {
-    private var tasksList: MutableList<Task> = mutableListOf()
+    //Static Properties and Methods Called from other classes by MainActivity.staticProp
+    companion object {
+        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
+        var tasksList = mutableListOf<Task>()
+        val taskReminderNotificationTitle = "Reminded On:"
+        val hoursInMillisOffset = 14400000
+
+        @RequiresApi(Build.VERSION_CODES.S)
+        fun canScheduleExactAlarms(context: Context): Boolean {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            return alarmManager.canScheduleExactAlarms()
+        }
+
+        fun scheduleNotification(
+            context: Context,
+            dateTimeLong: Long,
+            title: String,
+            message: String,
+            notificationID: Int
+        ) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (!canScheduleExactAlarms(context)) {
+                    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                    intent.data = Uri.parse("package:${context.packageName}")
+                    context.startActivity(intent)
+                    return
+                }
+            }
+
+            val intent = Intent(context, Notification::class.java).apply {
+                putExtra("title", title)
+                putExtra("message", message)
+                putExtra("notificationID", notificationID)
+            }
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                notificationID,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            try {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    dateTimeLong,
+                    pendingIntent
+                )
+            } catch (e: SecurityException) {
+                // Handle the exception (e.g., fallback to inexact alarm or notify the user)
+                Log.e("AlarmScheduler", "Failed to schedule exact alarm", e)
+                // Fallback to inexact alarm
+                alarmManager.set(
+                    AlarmManager.RTC_WAKEUP,
+                    dateTimeLong,
+                    pendingIntent
+                )
+            }
+        }
+    }
+
+    //Instance Properties and Methods
     private var selectionState = false
     private var sortMode = "descending"
     private lateinit var tasksRecyclerAdapter: TaskRecyclerAdapter
@@ -68,8 +130,6 @@ class MainActivity : AppCompatActivity() {
     private var editTaskTimeNotForDisplay = ""
     private var editTaskTime = ""
 
-    private val taskReminderNotificationTitle = "Reminded On:"
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -92,6 +152,26 @@ class MainActivity : AppCompatActivity() {
         buildTaskRecyclerContainer(selectionState)
         createAddTaskFunctionality()
         createDropdownMenuFunctionality()
+        startTaskReminderService()
+    }
+
+    private fun startTaskReminderService() {
+        val serviceIntent = Intent(this, TaskReminderService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+    }
+
+    private fun stopTaskReminderService() {
+        val serviceIntent = Intent(this, TaskReminderService::class.java)
+        stopService(serviceIntent)
+    }
+
+    private fun restartTaskReminderService() {
+        stopTaskReminderService()
+        startTaskReminderService()
     }
 
     private fun createAddTaskFunctionality() {
@@ -167,15 +247,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 if (newTaskDate != "" || newTaskTime != "") {
                     val taskID = tasksList.size + 1
-                    tasksList.add(Task(taskID, newTaskContent, newTaskDate, newTaskTime, dateFormat.format(System.currentTimeMillis())))
                     val dateTimeLongLocal = convertStringToMillis("$newTaskDate $newTaskTimeNotForDisplay")
                     val dateTimeLong = convertToUtcMillis(dateTimeLongLocal)
-                    scheduleNotification(
-                        this,
-                        dateTimeLong,
-                        newTaskContent,
-                        "$taskReminderNotificationTitle $newTaskDate $newTaskTime",
-                        taskID)
+                    tasksList.add(Task(taskID, newTaskContent, newTaskDate, newTaskTime, dateFormat.format(System.currentTimeMillis()), dateTimeLong))
+                    restartTaskReminderService()
                     saveTasksDataPersistent()
                     refreshTaskRecyclerContainer()
                     bottomSheetDialog.dismiss()
@@ -286,22 +361,18 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             if (editTaskDate != "" || editTaskTime != "") {
-                for (task in tasksList) {
+                val dateTimeLongLocal = convertStringToMillis("$editTaskDate $editTaskTimeNotForDisplay")
+                val dateTimeLong = convertToUtcMillis(dateTimeLongLocal)
+                tasksList.forEach {
+                    task: Task ->
                     if (task.id == currentEditingTask.id) {
                         task.content = editTaskContent
                         task.date = editTaskDate
                         task.time = editTaskTime
+                        task.due = dateTimeLong
                     }
                 }
-                cancelNotification(this, currentEditingTask.id)
-                val dateTimeLongLocal = convertStringToMillis("$editTaskDate $editTaskTimeNotForDisplay")
-                val dateTimeLong = convertToUtcMillis(dateTimeLongLocal)
-                scheduleNotification(
-                    this,
-                    dateTimeLong,
-                    editTaskContent,
-                    "$taskReminderNotificationTitle $editTaskDate $editTaskTime",
-                    currentEditingTask.id)
+                restartTaskReminderService()
                 saveTasksDataPersistent()
                 refreshTaskRecyclerContainer()
                 bottomSheetDialog.dismiss()
@@ -379,6 +450,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshTaskRecyclerContainer() {
+        updateSubText()
         val sortedList = sortList()
         if (tasksRecyclerAdapter != null) {
             tasksRecyclerAdapter.updateAllItems(sortedList, selectionState)
@@ -390,11 +462,9 @@ class MainActivity : AppCompatActivity() {
         deleteButton.setOnClickListener {
             if (selectionState) {
                 tasksList = tasksList.filter { task: Task ->
-                    if (task.selected) {
-                        cancelNotification(this, task.id)
-                    }
                     !task.selected
                 }.toMutableList()
+                restartTaskReminderService()
                 saveTasksDataPersistent()
                 refreshTaskRecyclerContainer()
                 if (tasksList.size == 0) {
@@ -481,83 +551,7 @@ class MainActivity : AppCompatActivity() {
             set(Calendar.MILLISECOND, localCalendar.get(Calendar.MILLISECOND))
         }
 
-        return utcCalendar.timeInMillis + 14400000
-    }
-
-    @RequiresApi(Build.VERSION_CODES.S)
-    fun canScheduleExactAlarms(context: Context): Boolean {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        return alarmManager.canScheduleExactAlarms()
-    }
-
-    private fun scheduleNotification(
-        context: Context,
-        dateTimeLong: Long,
-        title: String,
-        message: String,
-        notificationID: Int
-    ) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (!canScheduleExactAlarms(context)) {
-                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
-                intent.data = Uri.parse("package:${context.packageName}")
-                context.startActivity(intent)
-                return
-            }
-        }
-
-        val intent = Intent(context, Notification::class.java).apply {
-            putExtra("title", title)
-            putExtra("message", message)
-            putExtra("notificationID", notificationID)
-        }
-
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            notificationID,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        try {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                dateTimeLong,
-                pendingIntent
-            )
-            Log.d("Notification Schedule", "$dateTimeLong | $message | $title")
-        } catch (e: SecurityException) {
-            // Handle the exception (e.g., fallback to inexact alarm or notify the user)
-            Log.e("AlarmScheduler", "Failed to schedule exact alarm", e)
-            // Fallback to inexact alarm
-            alarmManager.set(
-                AlarmManager.RTC_WAKEUP,
-                dateTimeLong,
-                pendingIntent
-            )
-        }
-    }
-
-    private fun cancelNotification(context: Context, notificationId: Int) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, Notification::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            notificationId,
-            intent,
-            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        pendingIntent?.let {
-            alarmManager.cancel(it)
-            it.cancel()
-        }
-    }
-
-    companion object {
-        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
+        return utcCalendar.timeInMillis + hoursInMillisOffset
     }
 
     private fun checkNotificationPermission() {
@@ -689,7 +683,7 @@ class MainActivity : AppCompatActivity() {
         val currentDateTime = dateFormat.format(Date(System.currentTimeMillis()))
         contents.forEachIndexed {
             index, content ->
-            val task = Task(index + 1, content, dates[index], times[index], currentDateTime)
+            val task = Task(index + 1, content, dates[index], times[index], currentDateTime, 0)
             tasksList.add(task)
         }
     }
