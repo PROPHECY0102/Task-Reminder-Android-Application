@@ -6,7 +6,6 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.example.taskreminderapp.MainActivity.Companion.hoursInMillisOffset
 import com.example.taskreminderapp.MainActivity.Companion.scheduleNotification
 import com.example.taskreminderapp.MainActivity.Companion.taskReminderNotificationTitle
 
@@ -39,6 +38,7 @@ class TaskReminderService : Service() {
         MainActivity.tasksList.forEach {
             task: Task ->
             if (task.due > System.currentTimeMillis()) {
+                Log.d("Time", "${task.due} | ${System.currentTimeMillis()}")
                 scheduleNotification(this, task.due, task.content, "${taskReminderNotificationTitle} ${task.date} ${task.time}", task.id)
             }
         }
@@ -69,5 +69,16 @@ class TaskReminderService : Service() {
             .setSmallIcon(R.drawable.task_reminder_ic_foreground)
             .setContentIntent(pendingIntent)
             .build()
+    }
+
+    private fun scheduleTestNotification() {
+        val testTime = System.currentTimeMillis() + 3 * 60 * 1000 // 3 minutes from now
+        scheduleNotification(
+            this,
+            testTime,
+            "Test Content",
+            "Test Notification (3 minutes)",
+            Int.MAX_VALUE // Use a unique ID for the test notification
+        )
     }
 }

@@ -39,6 +39,7 @@ import java.util.Date
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.io.FileNotFoundException
+import java.util.Locale
 import java.util.TimeZone
 
 class MainActivity : AppCompatActivity() {
@@ -47,7 +48,6 @@ class MainActivity : AppCompatActivity() {
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
         var tasksList = mutableListOf<Task>()
         val taskReminderNotificationTitle = "Reminded On:"
-        val hoursInMillisOffset = 14400000
 
         @RequiresApi(Build.VERSION_CODES.S)
         fun canScheduleExactAlarms(context: Context): Boolean {
@@ -524,7 +524,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun convertStringToMillis(dateString: String): Long {
-        val format = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
+        val format = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+        format.timeZone = TimeZone.getTimeZone("GMT+8")
         try {
             val date = format.parse(dateString)
             return date?.time ?: throw IllegalArgumentException("Invalid date string")
@@ -533,25 +534,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun convertToUtcMillis(localTimeInMillis: Long): Long {
-        val localDate = Date(localTimeInMillis)
-        val localCalendar = Calendar.getInstance().apply {
-            time = localDate
-        }
-
-        val utcCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-            set(
-                localCalendar.get(Calendar.YEAR),
-                localCalendar.get(Calendar.MONTH),
-                localCalendar.get(Calendar.DAY_OF_MONTH),
-                localCalendar.get(Calendar.HOUR_OF_DAY),
-                localCalendar.get(Calendar.MINUTE),
-                localCalendar.get(Calendar.SECOND)
-            )
-            set(Calendar.MILLISECOND, localCalendar.get(Calendar.MILLISECOND))
-        }
-
-        return utcCalendar.timeInMillis + hoursInMillisOffset
+    private fun convertToUtcMillis(gmt8TimeInMillis: Long): Long {
+        return gmt8TimeInMillis
     }
 
     private fun checkNotificationPermission() {
