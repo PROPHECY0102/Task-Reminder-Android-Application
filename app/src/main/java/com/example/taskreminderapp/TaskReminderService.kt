@@ -9,6 +9,7 @@ import androidx.core.app.NotificationCompat
 import com.example.taskreminderapp.MainActivity.Companion.scheduleNotification
 import com.example.taskreminderapp.MainActivity.Companion.taskReminderNotificationTitle
 
+// This class inherits from Service as startForeground() requires a service object
 class TaskReminderService : Service() {
 
     companion object {
@@ -25,6 +26,7 @@ class TaskReminderService : Service() {
         createNotificationChannel()
     }
 
+    // Once the foreground service has started all pending task's notifications will be reschedule
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = createNotification()
         startForeground(NOTIFICATION_ID, notification)
@@ -34,6 +36,7 @@ class TaskReminderService : Service() {
         return START_STICKY
     }
 
+    // Method to schedule notifications from tasks list, tasks that are past due are ignored
     private fun scheduleTasksNotifications() {
         MainActivity.tasksList.forEach {
             task: Task ->
@@ -56,6 +59,7 @@ class TaskReminderService : Service() {
         }
     }
 
+    // Notification indicating that the foreground service has been started and is currently active
     private fun createNotification(): android.app.Notification {
         val notificationIntent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
@@ -71,6 +75,7 @@ class TaskReminderService : Service() {
             .build()
     }
 
+    // Debugging method to test notifications, not used in production
     private fun scheduleTestNotification() {
         val testTime = System.currentTimeMillis() + 3 * 60 * 1000 // 3 minutes from now
         scheduleNotification(

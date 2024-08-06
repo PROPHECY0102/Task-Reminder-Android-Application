@@ -46,15 +46,18 @@ class MainActivity : AppCompatActivity() {
     //Static Properties and Methods Called from other classes by MainActivity.staticProp
     companion object {
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
+        //TasksList acts like a global
         var tasksList = mutableListOf<Task>()
         val taskReminderNotificationTitle = "Reminded On:"
 
+        // Boolean for newer API to check if notification is able to schedule
         @RequiresApi(Build.VERSION_CODES.S)
         fun canScheduleExactAlarms(context: Context): Boolean {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             return alarmManager.canScheduleExactAlarms()
         }
 
+        // Method to schedule single notification with set content and exact date/time to notify
         fun scheduleNotification(
             context: Context,
             dateTimeLong: Long,
@@ -64,6 +67,7 @@ class MainActivity : AppCompatActivity() {
         ) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
+            // Check if the application can push notification else ask for permission
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (!canScheduleExactAlarms(context)) {
                     val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
@@ -73,12 +77,14 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            // Passing down data to Notification.kt to build notification template
             val intent = Intent(context, Notification::class.java).apply {
                 putExtra("title", title)
                 putExtra("message", message)
                 putExtra("notificationID", notificationID)
             }
 
+            // Creating the notification into a pending intent
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
                 notificationID,
@@ -86,6 +92,7 @@ class MainActivity : AppCompatActivity() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
+            // Schedule the Notification as a pending intent to be executed on a specified time in the future
             try {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
@@ -105,7 +112,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    //Instance Properties and Methods
+    // Instance Properties and Methods
     private var selectionState = false
     private var sortMode = "descending"
     private lateinit var tasksRecyclerAdapter: TaskRecyclerAdapter
@@ -130,6 +137,7 @@ class MainActivity : AppCompatActivity() {
     private var editTaskTimeNotForDisplay = ""
     private var editTaskTime = ""
 
+    // This method is used for initialising GUI and initialise state, fetch persistent data, add button functionality
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -155,6 +163,8 @@ class MainActivity : AppCompatActivity() {
         startTaskReminderService()
     }
 
+    // startTaskReminderService, stopTaskReminderService, and restartTaskReminderService() is used for
+    // Running foreground service which is required to send notification locally via application background
     private fun startTaskReminderService() {
         val serviceIntent = Intent(this, TaskReminderService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -174,26 +184,33 @@ class MainActivity : AppCompatActivity() {
         startTaskReminderService()
     }
 
+    // This is used for enabling Create Tasks functionality
     private fun createAddTaskFunctionality() {
+        // Add Task Button is on the bottom right of the UI which floats above the entire Task Reminder UI
         val addTaskButton = findViewById<FloatingActionButton>(R.id.btnAddTask)
         addTaskButton.setOnClickListener {
             resetNewTaskInputs()
+            // Create and initialise a BottomSheetDialog which is a way to do an overlay drawer UI which appears above the current main UI
             val bottomSheetDialog = BottomSheetDialog(this)
+            // BottomSheetDialog design for creating tasks is inflated from R.layout.add_new_task_modal
             val bottomSheetView = layoutInflater.inflate(R.layout.add_new_task_modal, null)
 
             bottomSheetDialog.setContentView(bottomSheetView)
             val newTaskEditText = bottomSheetView.findViewById<EditText>(R.id.editTextNewTask)
+            // When the overlay appears setfocus onto EditText and show keyboard
             bottomSheetDialog.setOnShowListener {
                 newTaskEditText.requestFocus()
                 showKeyboard(newTaskEditText)
             }
             bottomSheetDialog.show()
 
+            // Dismiss Overlay by clicking cancel
             val cancelButton = bottomSheetView.findViewById<Button>(R.id.btnCancelTask)
             cancelButton.setOnClickListener {
                 bottomSheetDialog.dismiss()
             }
 
+            // Enable capturing of date input and format into dd/MM/yyyy
             val setDateButton = bottomSheetView.findViewById<Button>(R.id.btnSetDate)
             setDateButton.setOnClickListener {
                 val datePickerView = DatePickerDialog(
@@ -210,6 +227,7 @@ class MainActivity : AppCompatActivity() {
                 datePickerView.show()
             }
 
+            // Enable capturing of time input and format into HH:mm:ss (For Display: hh:mm A.M/P.M)
             val setTimeButton = bottomSheetView.findViewById<Button>(R.id.btnSetTime)
             setTimeButton.setOnClickListener {
                 val timePickerView = TimePickerDialog(
@@ -220,8 +238,9 @@ class MainActivity : AppCompatActivity() {
                         val amPm = if (selectedHour < 12) "A.M" else "P.M"
                         val hour = if (selectedHour > 12) selectedHour - 12 else if (selectedHour == 0) 12 else selectedHour
                         val paddedHour = hour.toString().padStart(2, '0')
+                        val paddedSelectedHour = selectedHour.toString().padStart(2, '0')
                         val paddedMinute = selectedMinute.toString().padStart(2, '0')
-                        newTaskTimeNotForDisplay = "$paddedHour:$paddedMinute:00"
+                        newTaskTimeNotForDisplay = "$paddedSelectedHour:$paddedMinute:00"
                         newTaskTime = "${paddedHour}:${paddedMinute} $amPm"
                         updateTimeText(setTimeButton, newTaskTime)
                     },
@@ -230,10 +249,12 @@ class MainActivity : AppCompatActivity() {
                 timePickerView.show()
             }
 
+            // Check if all three inputs (task content, date and time) is valid and set before saving task onto the tasks list
             val saveButton = bottomSheetView.findViewById<Button>(R.id.btnCreateSave)
             saveButton.setOnClickListener {
                 newTaskContent = newTaskEditText.text.toString()
                 updateCurrentTime()
+                // Check task content EditText if it is empty then show an alert view to warn the user
                 if (newTaskContent == "") {
                     val alertView = AlertDialog.Builder(this)
                     alertView.setTitle("Task Content cannot be Empty!")
@@ -245,16 +266,19 @@ class MainActivity : AppCompatActivity() {
                     alertView.show()
                     return@setOnClickListener
                 }
+                // Check if the date and time are set before saving the task
                 if (newTaskDate != "" || newTaskTime != "") {
                     val taskID = tasksList.size + 1
                     val dateTimeLongLocal = convertStringToMillis("$newTaskDate $newTaskTimeNotForDisplay")
                     val dateTimeLong = convertToUtcMillis(dateTimeLongLocal)
+                    Log.d("Time", "$dateTimeLong | ${System.currentTimeMillis()}")
                     tasksList.add(Task(taskID, newTaskContent, newTaskDate, newTaskTime, dateFormat.format(System.currentTimeMillis()), dateTimeLong))
                     restartTaskReminderService()
                     saveTasksDataPersistent()
                     refreshTaskRecyclerContainer()
                     bottomSheetDialog.dismiss()
                     resetNewTaskInputs()
+//                    Toast.makeText(this, )
                 } else {
                     val alertView = AlertDialog.Builder(this)
                     alertView.setTitle("No Date or Time has been set!")
@@ -269,10 +293,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // This is used for enabling Edit Task Functionality (User clicks on a specific task CardView/task_row_card)
     private fun editCurrentTaskFunctionality() {
         if (currentEditingTask == null) return
         resetEditTaskInputs()
         val bottomSheetDialog = BottomSheetDialog(this)
+        // BottomSheetView is inflated from R.layout.edit_existing_task_model
         val bottomSheetView = layoutInflater.inflate(R.layout.edit_existing_task_modal, null)
 
         bottomSheetDialog.setContentView(bottomSheetView)
@@ -283,18 +309,20 @@ class MainActivity : AppCompatActivity() {
         }
         bottomSheetDialog.show()
 
+        // Set EditText placeholder as the specific task's content the user is currently editing on
         editingTaskEditText.setText(currentEditingTask.content)
 
-        // Convert date string
+        // Convert date string of the current editing task
         val dateString = currentEditingTask.date
         val (day, month, year) = dateString.split("/").map { it.toInt() }
 
-        // Convert time string
+        // Convert time string of the current editing task
         val timeString = currentEditingTask.time
         val timeParts = timeString.replace(".", "").split(":")
         val hourMinute = timeParts[0].toInt()
         val minute = timeParts[1].substring(0, 2).toInt()
         val period = timeParts[1].substring(3)
+
 
         val hour = when {
             period.uppercase() == "PM" && hourMinute != 12 -> hourMinute + 12
@@ -336,8 +364,9 @@ class MainActivity : AppCompatActivity() {
                     val amPm = if (selectedHour < 12) "A.M" else "P.M"
                     val hour = if (selectedHour > 12) selectedHour - 12 else if (selectedHour == 0) 12 else selectedHour
                     val paddedHour = hour.toString().padStart(2, '0')
+                    val paddedSelectedHour = selectedHour.toString().padStart(2, '0')
                     val paddedMinute = selectedMinute.toString().padStart(2, '0')
-                    editTaskTimeNotForDisplay = "$paddedHour:$paddedMinute:00"
+                    editTaskTimeNotForDisplay = "$paddedSelectedHour:$paddedMinute:00"
                     editTaskTime = "${paddedHour}:${paddedMinute} $amPm"
                     updateTimeText(setTimeButton, editTaskTime)
                 },
@@ -346,6 +375,7 @@ class MainActivity : AppCompatActivity() {
             timePickerView.show()
         }
 
+        // Instead of creating a new task to save it finds the current editing task by ID then edit its properties
         val saveButton = bottomSheetView.findViewById<Button>(R.id.btnCreateEdit)
         saveButton.setOnClickListener {
             editTaskContent = editingTaskEditText.text.toString()
@@ -391,18 +421,21 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    // Reset inputs for creating new task
     private fun resetNewTaskInputs() {
         newTaskContent = ""
         newTaskTime = ""
         newTaskDate = ""
     }
 
+    // Reset inputs for editing task
     private fun resetEditTaskInputs() {
         editTaskContent = ""
         editTaskDate = ""
         editTaskTime = ""
     }
 
+    // Get current date/time used in Creating new task to set current date/time when user clicks on set date or time
     private fun updateCurrentTime() {
         calendar = Calendar.getInstance()
         currentYear = calendar.get(Calendar.YEAR)
@@ -420,10 +453,17 @@ class MainActivity : AppCompatActivity() {
         button.setText(time)
     }
 
+    // RecyclerView is used for the UI tasks list acts as a container
+    // which will allow for a continuous overflow of task by inflating task_row_card
+    // RecyclerView is more efficient than ScrollView allowing for dynamic item content and saving scroll position on refresh
     private fun buildTaskRecyclerContainer(localSelectionState: Boolean) {
+        // Sort list based on ascending/descending state of ID
         val sortedList = sortList()
         val tasksRecyclerContainer = findViewById<RecyclerView>(R.id.RecyclerTasksContainer)
         this.tasksRecyclerAdapter = TaskRecyclerAdapter(sortedList, localSelectionState,
+            // On each Item when long click (holding) a specific item will enable selection mode
+            // Making it easy for use to select the task they want to delete
+            // On long click again will disable selection mode
             onItemLongClick = {
             task: Task ->
             selectionState = !selectionState
@@ -434,7 +474,7 @@ class MainActivity : AppCompatActivity() {
             }
             updateSubText()
             refreshTaskRecyclerContainer()
-        }, onItemClick = {
+        }, onItemClick = { // On Each Item Click will let user to edit the current clicked task unless the user is in selection mode
             task: Task ->
             if (selectionState) {
                 task.selected = !task.selected
@@ -445,10 +485,12 @@ class MainActivity : AppCompatActivity() {
                 editCurrentTaskFunctionality()
             }
         })
+        // Apply adapter and configure layout manager of RecyclerView
         tasksRecyclerContainer.adapter = tasksRecyclerAdapter
         tasksRecyclerContainer.layoutManager = LinearLayoutManager(this)
     }
 
+    // This method is used for refreshing the RecyclerView. Called whenever taskslist changes or selectionState alternates (True/False)
     private fun refreshTaskRecyclerContainer() {
         updateSubText()
         val sortedList = sortList()
@@ -457,6 +499,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Enable task deletion on selection mode (Trash Can Icon on the top Right)
     private fun createDeleteButtonFunctionality() {
         val deleteButton = findViewById<ImageButton>(R.id.btnDeleteTasks)
         deleteButton.setOnClickListener {
@@ -475,6 +518,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Update subtext that show item count
     private fun updateSubText() {
         val subText = findViewById<TextView>(R.id.textViewTaskAmount)
         val deleteButton = findViewById<ImageButton>(R.id.btnDeleteTasks)
@@ -493,6 +537,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // When the user exits the selection mode iterate and change all currently selected state tasks to false
     private fun refreshSelectionTasksList() {
         tasksList.forEach {
             task: Task ->
@@ -500,11 +545,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Show keyboard when overlay is used (Helper method)
     private fun showKeyboard(view: View) {
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
     }
 
+    // Save Tasks persistently by utilising internal storage
+    // Convert tasks list into a static json text when called
     private fun saveTasksDataPersistent() {
         val json = Gson().toJson(TasksListStructure(tasksList))
         openFileOutput("tasks.json", Context.MODE_PRIVATE).use {
@@ -513,6 +561,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Fetch tasks list from the saved json file and initialise the tasksList variable
     private fun initTasksDataPersistent(): List<Task> {
         return try {
             val fileContents = openFileInput("tasks.json").bufferedReader().use { it.readText() }
@@ -523,6 +572,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Helper Methods to convert date/time string to milliseconds in UTC Epoch (Using GMT+8)
     private fun convertStringToMillis(dateString: String): Long {
         val format = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
         format.timeZone = TimeZone.getTimeZone("GMT+8")
@@ -534,10 +584,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Not needed (Plan to remove in the future redundant after refactor)
     private fun convertToUtcMillis(gmt8TimeInMillis: Long): Long {
         return gmt8TimeInMillis
     }
 
+    // Helper Method to check if push notification is enabled on this application
     private fun checkNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             when {
@@ -572,17 +624,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Helper Method for Notification permission
     private fun areNotificationsEnabled(): Boolean {
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         return notificationManager.areNotificationsEnabled()
     }
 
+    // If disable or deny, show a reason why the user should allow push notification
     private fun showNotificationImportanceDialog() {
         // Implement a dialog or in-app UI to explain why notifications are important
         // You can use AlertDialog, a custom dialog, or navigate to a specific fragment/activity
         AlertDialog.Builder(this)
             .setTitle("Enable Notifications")
-            .setMessage("Notifications are important for this app because...")
+            .setMessage("Notifications are important for task reminder to send notification")
             .setPositiveButton("Enable") { _, _ ->
                 openAppSettings()
             }
@@ -592,12 +646,14 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    // Open settings to allowed denied users to allow push notification
     private fun openAppSettings() {
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
         intent.data = Uri.fromParts("package", packageName, null)
         startActivity(intent)
     }
 
+    // Enabling Dropdown functionality for sorting tasks
     private fun createDropdownMenuFunctionality() {
         val dropdownButton = findViewById<ImageButton>(R.id.btnMenuDropdown)
         dropdownButton.setOnClickListener {
@@ -631,7 +687,7 @@ class MainActivity : AppCompatActivity() {
         return tasksList.sortedBy { it.id }.toMutableList()
     }
 
-    // Unused method
+    // Unused method on released only used for debugging
     // Was used to fill the application with dummy tasks to test RecyclerView functionality
     private fun fillDummyTasks() {
         val contents = listOf("Discuss Plans of World Domination with my War Secretary"
