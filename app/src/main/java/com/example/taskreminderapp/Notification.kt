@@ -9,8 +9,11 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 
+// This class inherits from BroadcastReceiver, Once the AlarmManager reach the specify date/time it will send
+// an intent to the BroadcastReceiver which builds and then send a notification to the user device
 class Notification: BroadcastReceiver() {
 
+    // Get contents pass over from MainActivity.scheduleNotification()
     override fun onReceive(context: Context?, intent: Intent?) {
         if (context != null && intent != null) {
             val title = intent.getStringExtra("title") ?: "Scheduled Notification"
@@ -20,6 +23,7 @@ class Notification: BroadcastReceiver() {
         }
     }
 
+    // Method used to build the notification here notification specifications can be configured
     private fun showNotification(context: Context, title: String, message: String, notificationId: Int) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -38,6 +42,7 @@ class Notification: BroadcastReceiver() {
         notificationManager.notify(notificationId, notification)
     }
 
+    // When the user clicks the notification it will launch the task reminder application
     private fun createPendingIntent(context: Context): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
