@@ -69,7 +69,7 @@ class TaskRecyclerAdapter(
     // Replace the contents of a view
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val task = tasksList[position]
-        holder.textViewTaskContent.setText(task.shortenContentText(35))
+        holder.textViewTaskContent.setText(task.shortenContentText(80))
         holder.textViewTaskDateTime.setText("${task.date} ${task.time}")
         holder.bind(task, onItemLongClick, onItemClick)
     }

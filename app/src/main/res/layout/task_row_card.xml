@@ -49,7 +49,8 @@
                     android:text="Task Content Preview"
                     android:textColor="@color/foreground"
                     android:textSize="18dp"
-                    android:fontFamily="@font/custom_medium"/>
+                    android:fontFamily="@font/custom_medium"
+                    android:maxLines="3"/>
 
                 <TextView
                     android:id="@+id/textViewTaskDateTime"
